@@ -89,11 +89,13 @@ class Parser<ITokenElements extends IAbstractTokenElements,
     tokenMapReverse: Map<number,string>;
     nodeMap: Map<string,number>;
     nodeMapReverse: Map<number,string>;
+    isLeftRecursive: boolean[];
 
     constructor(elementsBuilder: IParserElements, debug = false) {
         this.startEdge = [];
         this.accept = [];
         this.tokenMap = elementsBuilder.tokenMap;
+        this.isLeftRecursive = [];
         const nodeKeys = Object
             .keys(elementsBuilder)
             .filter(x=>x != "token" && x != "tokenMap");
@@ -109,7 +111,8 @@ class Parser<ITokenElements extends IAbstractTokenElements,
             .keys(elementsBuilder.token)
             .filter(x=>x != "split")
             .forEach(x=>globalMock["token"][x] = this.tokenMap.get(x));
-        Object.keys(elementsBuilder)
+        Object
+            .keys(elementsBuilder)
             .filter(x=>x != "token" && x != "tokenMap")
             .forEach(key=> {
                 const elements = elementsBuilder[key](globalMock);
@@ -137,30 +140,58 @@ class Parser<ITokenElements extends IAbstractTokenElements,
                     this.accept[this.nodeMap.get(key)][nowPoint] = rule.action;
                 });
             });
+        this.startEdge.forEach((edges, key)=>{
+            for(let edge of edges[0]){
+                if(edge.rule == key){//left recursive
+                    this.isLeftRecursive[key] = true;
+                    return;
+                }
+            }
+        });
         if (debug) {
             this.tokenMapReverse = new Map<number,string>(<[number,string][]>
-                Array.from(this.tokenMap.keys()).map(key=>[this.tokenMap[key], key]));
+                Array.from(this.tokenMap.keys()).map(key=>[this.tokenMap.get(key), key]));
             this.nodeMapReverse = new Map<number,string>(<[number,string][]>
-                Array.from(this.nodeMapReverse.keys()).map(key=>[this.nodeMapReverse[key], key]));
+                Array.from(this.nodeMap.keys()).map(key=>[this.nodeMap.get(key), key]));
         }
     }
 
     tmpToken: string[];
     tmpTokenType: number[];
     parseNow: number;
-
-    __parse(target: number) {
+    tmpLRResult : any;
+    __resharpLeftRecuresiveResult(originalResult: any){
+        if(originalResult[originalResult.length - 2]){
+            const nextArray = originalResult[originalResult.length - 2];
+            const next = nextArray.slice(0,nextArray.length - 2);
+            this.tmpLRResult = nextArray[nextArray.length - 1]([this.tmpLRResult].concat(next));
+            this.__resharpLeftRecuresiveResult(nextArray);
+        }
+    }
+    __parse(target: number, parseLeftRecursive : boolean = false) {
         let point = 0;
         let parseResult = null;
         let parseResultPoint = null;
         let tmpParseResult = [];
+        let resultPoint = null;
+        if(parseLeftRecursive){
+            console.log("@exe::recursive");
+            for (const edge of this.startEdge[target][point]) {
+                if(edge.rule == target){
+                    point = edge.to;
+                    break;
+                }
+            }
+        }
         while (true) {
             const savedParseNow = this.parseNow;
             let success = false;
             const edges = this.startEdge[target][point];
             for (const edge of edges) {
+                if(this.isLeftRecursive[target] && !parseLeftRecursive && edge.rule == target) continue;
                 if (edge.rule < 0) { //terminal
                     if (this.tmpTokenType[this.parseNow] == edge.rule) {
+                        console.log(`#parsing: terminal${this.tokenMapReverse.get(edge.rule)}$$${this.tmpToken[this.parseNow]}`);
                         tmpParseResult.push(this.tmpToken[this.parseNow]);
                         this.parseNow++;
                         point = edge.to;
@@ -171,6 +202,7 @@ class Parser<ITokenElements extends IAbstractTokenElements,
                 else {//non terminal
                     const tempResult = this.__parse(edge.rule);
                     if (tempResult) {
+                       // console.log(`#parsing: non-terminal${this.nodeMapReverse.get(edge.rule)}$$${this.tmpToken[this.parseNow]}`);
                         tmpParseResult.push(tempResult);
                         point = edge.to;
                         success = true;
@@ -181,14 +213,33 @@ class Parser<ITokenElements extends IAbstractTokenElements,
             if (!success) {
                 if (parseResult) {
                     this.parseNow = parseResultPoint;
-                    return parseResult
+                    if(this.isLeftRecursive[target] && !parseLeftRecursive){
+                        console.log("@start::recursive");
+                        const leftParseResult = this.__parse(target, true);
+                        parseResult = this.accept[target][resultPoint](parseResult);
+                        if(!leftParseResult){ //single node
+                            return parseResult;
+                        }
+                        this.tmpLRResult = parseResult;
+                        this.__resharpLeftRecuresiveResult([parseResult,leftParseResult,null]);
+                        console.log("@stop::recursive");
+                        return this.tmpLRResult;
+                    }
+                    if(parseLeftRecursive){
+                        console.log("@mid::recursive");
+                        parseResult.push(this.__parse(target, true));
+                        return parseResult.concat([this.accept[target][resultPoint]]);
+                    }
+                    return this.accept[target][resultPoint](parseResult);
                 }
                 this.parseNow = savedParseNow;
                 tmpParseResult = [];
+                console.log("failed");
                 return null;
             }
             if (this.accept[target][point]) {
-                parseResult = this.accept[target][point](tmpParseResult);
+                parseResult = tmpParseResult;
+                resultPoint = point;
                 parseResultPoint = this.parseNow;
             }
         }
@@ -248,11 +299,11 @@ const parser = new Parser<IMyTokenElements, IMyParserElements<IMyTokenElements>>
             action: $=>$[0]
         },
         {
-            rules: [_.number, _.token.$multiply, _.product],
+            rules: [_.product, _.token.$multiply, _.number],
             action: $=>[$[0], '*', $[2]]
         },
         {
-            rules: [_.number, _.token.$div, _.product],
+            rules: [_.product, _.token.$div, _.number],
             action: $=>[$[0], '/', $[2]]
         }
     ],
@@ -262,15 +313,15 @@ const parser = new Parser<IMyTokenElements, IMyParserElements<IMyTokenElements>>
             action: $=>$[0]
         },
         {
-            rules: [_.product, _.token.$plus, _.sum],
+            rules: [_.sum, _.token.$plus, _.product],
             action: $=>[$[0], '+', $[2]]
         },
         {
-            rules: [_.product, _.token.$minus, _.sum],
+            rules: [_.sum, _.token.$minus, _.product],
             action: $=>[$[0], '-', $[2]]
         }
     ]
-});
+},true);
 const parseResult = parser.parse(token, tokenType, 'sum');
 console.log(parseResult);
 
