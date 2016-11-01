@@ -1,8 +1,9 @@
-tparse -- parser that scales
+tparse -- an LL(1) parser generator in TypeScript
 ===================
-author : Zhang Chengyi <zurl@live.com>
+Author : Zhang Chengyi <zurl@live.com>
 
-a LL(1) parser generator in TypeScript
+tparse is an LL(1) parser generator in TypeScript,
+which is used for making the parser quickly, easily and scaled.
 
 with tparse, you can
 + Write Parser Without Compile it
