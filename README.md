@@ -1,6 +1,6 @@
-tparse
+tparse -- parser that scales
 ===================
-parser that scales
+author : Zhang Chengyi <zurl@live.com>
 
 a LL(1) parser generator in TypeScript
 
