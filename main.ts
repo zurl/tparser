@@ -27,7 +27,8 @@ interface IParserElement extends IAbstractParserElement {
     rules: IRuleType[];
     action: ($: any[])=>any;
 }
-type IParserElementBuilder<IParserElements> = (_: IParserElements)=>IParserElement[];
+type IParserElementTuple = [IRuleType[],($: any[])=>any];
+type IParserElementBuilder<IParserElements> = (_: IParserElements)=>(IParserElement|IParserElementTuple)[];
 
 
 class EdgeRule {
@@ -115,10 +116,13 @@ class Parser<ITokenElements extends IAbstractTokenElements,
             .keys(elementsBuilder)
             .filter(x=>x != "token" && x != "tokenMap")
             .forEach(key=> {
-                const elements = elementsBuilder[key](globalMock);
                 this.startEdge[this.nodeMap.get(key)] = [[]];
                 this.accept[this.nodeMap.get(key)] = [];
                 const thisEdge = this.startEdge[this.nodeMap.get(key)];
+                const elements = elementsBuilder[key](globalMock).map(element=>isArray(element)? {
+                        rules: element[0],
+                        action: element[1],
+                    }:element);
                 elements.forEach(rule=> {
                     let nowPoint = 0;
                     rule.rules.forEach((nowRule: number)=> {
@@ -175,7 +179,6 @@ class Parser<ITokenElements extends IAbstractTokenElements,
         let tmpParseResult = [];
         let resultPoint = null;
         if(parseLeftRecursive){
-            console.log("@exe::recursive");
             for (const edge of this.startEdge[target][point]) {
                 if(edge.rule == target){
                     point = edge.to;
@@ -190,9 +193,7 @@ class Parser<ITokenElements extends IAbstractTokenElements,
             for (const edge of edges) {
                 if(this.isLeftRecursive[target] && !parseLeftRecursive && edge.rule == target) continue;
                 if (edge.rule < 0) { //terminal
-                    if (this.tmpTokenType[this.parseNow] == edge.rule) {
-                        console.log(`#parsing: terminal${this.tokenMapReverse.get(edge.rule)}$$${this.tmpToken[this.parseNow]}`);
-                        tmpParseResult.push(this.tmpToken[this.parseNow]);
+                    if (this.tmpTokenType[this.parseNow] == edge.rule) {tmpParseResult.push(this.tmpToken[this.parseNow]);
                         this.parseNow++;
                         point = edge.to;
                         success = true;
@@ -201,9 +202,7 @@ class Parser<ITokenElements extends IAbstractTokenElements,
                 }
                 else {//non terminal
                     const tempResult = this.__parse(edge.rule);
-                    if (tempResult) {
-                       // console.log(`#parsing: non-terminal${this.nodeMapReverse.get(edge.rule)}$$${this.tmpToken[this.parseNow]}`);
-                        tmpParseResult.push(tempResult);
+                    if (tempResult) {tmpParseResult.push(tempResult);
                         point = edge.to;
                         success = true;
                         break;
@@ -214,7 +213,6 @@ class Parser<ITokenElements extends IAbstractTokenElements,
                 if (parseResult) {
                     this.parseNow = parseResultPoint;
                     if(this.isLeftRecursive[target] && !parseLeftRecursive){
-                        console.log("@start::recursive");
                         const leftParseResult = this.__parse(target, true);
                         parseResult = this.accept[target][resultPoint](parseResult);
                         if(!leftParseResult){ //single node
@@ -222,11 +220,9 @@ class Parser<ITokenElements extends IAbstractTokenElements,
                         }
                         this.tmpLRResult = parseResult;
                         this.__resharpLeftRecuresiveResult([parseResult,leftParseResult,null]);
-                        console.log("@stop::recursive");
                         return this.tmpLRResult;
                     }
                     if(parseLeftRecursive){
-                        console.log("@mid::recursive");
                         parseResult.push(this.__parse(target, true));
                         return parseResult.concat([this.accept[target][resultPoint]]);
                     }
@@ -234,7 +230,6 @@ class Parser<ITokenElements extends IAbstractTokenElements,
                 }
                 this.parseNow = savedParseNow;
                 tmpParseResult = [];
-                console.log("failed");
                 return null;
             }
             if (this.accept[target][point]) {
@@ -288,40 +283,24 @@ const parser = new Parser<IMyTokenElements, IMyParserElements<IMyTokenElements>>
     token: tokenizer.token(),
     tokenMap: tokenizer.tokenMap(),
     number: _=>[
-        {
-            rules: [_.token.number],
-            action: $=>parseInt($[0])
-        }
+        [[_.token.number],$=>parseInt($[0])]
     ],
     product: _=>[
-        {
-            rules: [_.number],
-            action: $=>$[0]
-        },
-        {
-            rules: [_.product, _.token.$multiply, _.number],
-            action: $=>[$[0], '*', $[2]]
-        },
-        {
-            rules: [_.product, _.token.$div, _.number],
-            action: $=>[$[0], '/', $[2]]
-        }
+        [[_.number],$=>$[0]],
+        [[_.product, _.token.$multiply, _.number],$=>[$[0], '*', $[2]]],
+        [[_.product, _.token.$div, _.number],$=>[$[0], '/', $[2]]]
     ],
     sum: _=>[
-        {
-            rules: [_.product],
-            action: $=>$[0]
-        },
-        {
-            rules: [_.sum, _.token.$plus, _.product],
-            action: $=>[$[0], '+', $[2]]
-        },
-        {
-            rules: [_.sum, _.token.$minus, _.product],
-            action: $=>[$[0], '-', $[2]]
-        }
+        [[_.product],$=>$[0]],
+        [[_.sum, _.token.$plus, _.product],$=>[$[0], '+', $[2]]],
+        [[_.sum, _.token.$minus, _.product],$=>[$[0], '-', $[2]]]
     ]
 },true);
+function myprint(object){
+    if(isArray(object)){
+        return "["+object.map(x=>myprint(x)).join(", ")+"]";
+    }else return object;
+}
 const parseResult = parser.parse(token, tokenType, 'sum');
-console.log(parseResult);
+console.log(myprint(parseResult));
 
