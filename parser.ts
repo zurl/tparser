@@ -52,6 +52,7 @@ export class Parser<ITokenElements extends IAbstractTokenizer,
         this.parseFailedFlag = {};
         this.startEdge = [];
         this.accept = [];
+        this.parseStack = [];
         this.tokenMap = elementsBuilder.tokenMap;
         this.isLeftRecursive = [];
         this.enableDebug = debug;
@@ -111,12 +112,12 @@ export class Parser<ITokenElements extends IAbstractTokenizer,
                 }
             }
         });
-        if (debug) {
+       // if (debug) {
             this.tokenMapReverse = new Map<number,string>(<[number,string][]>
                 Array.from(this.tokenMap.keys()).map(key=>[this.tokenMap.get(key), key]));
             this.nodeMapReverse = new Map<number,string>(<[number,string][]>
                 Array.from(this.nodeMap.keys()).map(key=>[this.nodeMap.get(key), key]));
-        }
+        //}
     }
 
     enableDebug: boolean;
@@ -150,15 +151,11 @@ export class Parser<ITokenElements extends IAbstractTokenizer,
             if (edge.rule < 0) { //terminal
                 if (this.enableDebug)console.log(`try ${this.tokenMapReverse.get(edge.rule)}`);
                 if (this.tmpTokenType[this.parseNow] == edge.rule) {
+                    this.savedParseStack = null;
                     if (this.enableDebug)console.log("success");
                     closure.tempParseResult.push(this.tmpToken[this.parseNow]);
                     this.parseNow++;
                     this.__parse_step(edge.to, closure);
-                    console.log(`after try ${this.tokenMapReverse.get(edge.rule)} @ ${this.tokenMapReverse.get(this.tmpTokenType[this.parseNow])}`);
-
-                    //point = edge.to;
-                    //this.tempIsSuccess = true;
-                    //break;
                 }
             }
             else {//non terminal
@@ -167,9 +164,6 @@ export class Parser<ITokenElements extends IAbstractTokenizer,
                 if (tempResult != this.parseFailedFlag) {
                     closure.tempParseResult.push(tempResult);
                     this.__parse_step(edge.to, closure);
-                    console.log(`after try ${this.nodeMapReverse.get(edge.rule)} @ ${this.tokenMapReverse.get(this.tmpTokenType[this.parseNow])}`);
-                    //this.tempIsSuccess = true;
-                    //break;
                 }
             }
         }
@@ -177,7 +171,6 @@ export class Parser<ITokenElements extends IAbstractTokenizer,
             this.parseNow = closure.finalParseResultNow;
             if (this.isLeftRecursive[target] && !closure.parseLeftRecursive) {
                 const leftParseResult = this.__parse(target, true);
-                console.log(closure.finalParseResultPoint);
                 const parseResult = this.accept[target][closure.finalParseResultPoint](closure.finalParseResult);
                 if (leftParseResult == this.parseFailedFlag) { //single node
                     throw parseResult;
@@ -194,9 +187,11 @@ export class Parser<ITokenElements extends IAbstractTokenizer,
         }
         this.parseNow = savedParseNow;
         if (this.enableDebug)console.log("failed");
+        this.savedParseStack = this.parseStack.slice(0);
     }
 
     __parse(target: number, parseLeftRecursive: boolean = false) {
+        this.parseStack.push([this.nodeMapReverse.get(target), this.parseNow]);
         if (this.enableDebug)console.log(`parser ${this.nodeMapReverse.get(target)} @ ${this.tokenMapReverse.get(this.tmpTokenType[this.parseNow])} @ ${this.tmpToken[this.parseNow]} # ${parseLeftRecursive}`);
         let point = 0;
         if (parseLeftRecursive) {
@@ -220,14 +215,36 @@ export class Parser<ITokenElements extends IAbstractTokenizer,
         }catch(e){
             return e;
         }
+        this.parseStack.pop();
         return this.parseFailedFlag;
     }
-
+    savedParseStack: [string, number][];
+    parseStack: [string, number][];
     parse(token: string[], tokenType: number[], target: string) {
         this.tmpToken = token;
         this.tmpTokenType = tokenType;
         this.parseNow = 0;
-        return this.__parse(this.nodeMap.get(target));
+        const result =  this.__parse(this.nodeMap.get(target));
+        if(result == this.parseFailedFlag){
+            console.log("Parsing Failed:");
+            this.savedParseStack
+                .reverse()
+                .forEach(item=>{
+                    const left = Math.max(0, item[1] - 2);
+                    const right = Math.min(this.tmpToken.length - 1, item[1] + 2);
+                    console.log(`   at parsing "${item[0]}":\n      ${
+                        this.tmpToken.map((_,index)=>index == item[1]?`[${_}]`:_).slice(left,right + 1)}`);
+                });
+            return null;
+        }
+        return result;
+
     }
 
+}
+function mprint(obj){
+    if(isArray(obj))
+        return "[" + obj.map(x=>mprint(x)).join(",") + "]";
+    else
+        return obj;
 }
