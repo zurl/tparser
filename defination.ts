@@ -7,17 +7,23 @@ import {IAbstractTokenizer,IToken} from './tokenizer';
 import {IAbstactParser,ISymbol} from './parser';
 export interface IMyTokenizer extends IAbstractTokenizer {
     number: IToken;
-    symbol: IToken;
-    name: IToken;
-    $if: IToken;
-    $plus: IToken;
-    $minus: IToken;
-    $div: IToken;
-    $multiply: IToken;
+    string: IToken;
+    $lcb : IToken;
+    $rcb : IToken;
+    $lsb : IToken;
+    $rsb : IToken;
+    $colon : IToken;
+    $comma : IToken;
+    $true : IToken;
+    $false : IToken;
+    $null : IToken;
 }
 
 export interface IMyParser<T extends IAbstractTokenizer> extends IAbstactParser<T> {
-    number: ISymbol<IMyParser<T>>;
-    sum: ISymbol<IMyParser<T>>;
-    product: ISymbol<IMyParser<T>>;
+    item: ISymbol<IMyParser<T>>;
+    value: ISymbol<IMyParser<T>>;
+    array: ISymbol<IMyParser<T>>;
+    array_meta: ISymbol<IMyParser<T>>;
+    object: ISymbol<IMyParser<T>>;
+    object_meta: ISymbol<IMyParser<T>>;
 }

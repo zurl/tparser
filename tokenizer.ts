@@ -3,7 +3,7 @@
  *  @author zcy <zurl@live.com>
  *  Created at 11/1/2016
  */
-function isArray(o) {
+export function isArray(o) {
     return Object.prototype.toString.call(o) === "[object Array]";
 }
 export interface IAbstractTokenizer {
