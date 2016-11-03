@@ -18,7 +18,8 @@ export class Tokenizer<ITokenElement extends IAbstractTokenizer> {
     constructor(tokenElements: ITokenElement) {
         this.tokenElements = tokenElements;
         const tokenKeys = Object.keys(this.tokenElements).filter(x=>x != "split");
-        this.tokenMapVal = new Map<string,number>(<[string,number][]>tokenKeys.map((value, index)=>[value, -index - 1]));
+        this.tokenMapVal = new Map<string,number>(<[string,number][]>
+            tokenKeys.map((value, index)=>[value, -index - 1]));
         const tokenArray = tokenKeys.map(x=>isArray(this.tokenElements[x]) ?
             this.tokenElements[x].concat([this.tokenMapVal.get(x)])
             : [this.tokenElements[x], 0, this.tokenMapVal.get(x)]);

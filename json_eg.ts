@@ -6,16 +6,16 @@
 
 import {isArray, Tokenizer} from './tokenizer';
 import {Parser} from './parser';
-import {IMyTokenizer, IMyParser} from './defination';
+import {IMyTokenizer, IMyParser} from './json_eg_def';
 const tokenizer = new Tokenizer<IMyTokenizer>({
-    split: /\s*(:|,|\{|}|\[|]|[0-9]+(\.[0-9]+)?|"[^\"]*")\s*/y,
+    split: /\s*(:|,|\{|}|\[|]|[0-9]+(\.[0-9]+)?|"[^"]*")\s*/y,
     number: /[0-9]+(\.[0-9]+)?/,
-    string: /"[^\"]*"/,
+    string: /"[^"]*"/,
     $lcb: /\{/,
     $rcb: /}/,
     $lsb: /\[/,
     $rsb: /]/,
-    $colon: /\:/,
+    $colon: /:/,
     $comma: /,/,
     $true: /true/,
     $false: /false/,
@@ -68,5 +68,4 @@ const [token, tokenType] = tokenizer.tokenize(`
 }
 `);
 const parserResult = parser.parse(token, tokenType, 'object');
-
 console.log(parserResult);
