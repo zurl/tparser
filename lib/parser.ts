@@ -1,12 +1,10 @@
-import {IAbstractTokenizer} from "./tokenizer";
 /**
  *  @file
  *  @author zcy <zurl@live.com>
  *  Created at 11/1/2016
  */
-function isArray(o) {
-    return Object.prototype.toString.call(o) === "[object Array]";
-}
+import {IAbstractTokenElements} from "./tokenizer";
+import {isArray} from "./util";
 interface ParserClosure{
     target: number;
     tempParseResult: any[];
@@ -23,7 +21,7 @@ interface IParserElement extends IAbstractParserElement {
     action: ($: any[])=>any;
 }
 type IParserElementTuple = [IRuleType[],($: any[])=>any];
-type IRuleType = IAbstractTokenizer | IAbstractParserElement
+type IRuleType = IAbstractTokenElements | IAbstractParserElement
 class EdgeRule {
     rule: number;
     to: number;
@@ -34,12 +32,18 @@ class EdgeRule {
     }
 }
 export type ISymbol<IParserElements> = (_: IParserElements)=>(IParserElement|IParserElementTuple)[]
-export interface IAbstactParser<ITokenElements extends IAbstractTokenizer> {
+export interface IAbstractParser<ITokenElements extends IAbstractTokenElements> {
     token: ITokenElements;
     tokenMap: Map<string,number>;
 }
-export class Parser<ITokenElements extends IAbstractTokenizer,
-    IParserElements extends IAbstactParser<ITokenElements>> {
+
+
+
+// The generic constrain is virtual constrain that used to check the
+// validity of grammar rules.
+export class Parser<ITokenElements extends IAbstractTokenElements,
+    IParserElements extends IAbstractParser<ITokenElements>> {
+
     startEdge: EdgeRule[][][]; // name, points, rules
     accept: (($: any[])=>any)[][];
     tokenMap: Map<string,number>;
@@ -48,12 +52,31 @@ export class Parser<ITokenElements extends IAbstractTokenizer,
     nodeMapReverse: Map<number,string>;
     isLeftRecursive: boolean[];
 
-    constructor(elementsBuilder: IParserElements, debug = false) {
+    enableDebug: boolean;
+    tmpToken: string[];
+    tmpTokenType: number[];
+    parseNow: number;
+    tmpLRResult: any;
+
+    // This two stack is just records of parsing procedure
+    // which provide metadata to print debug information
+    savedParseStack: [string, number][];
+    parseStack: [string, number][];
+
+    // This two flags is used to be a unique identifier
+    // Due to the following parser use exception to be
+    // a method to jump from deep recursive
+    errorFlag : Object;
+    parseFailedFlag: Object;
+
+    constructor(elementsBuilder: IParserElements, debug = false, errorFlag = {}) {
+        this.errorFlag = errorFlag;
+        this.tokenMap = elementsBuilder.tokenMap;
+
         this.parseFailedFlag = {};
         this.startEdge = [];
         this.accept = [];
         this.parseStack = [];
-        this.tokenMap = elementsBuilder.tokenMap;
         this.isLeftRecursive = [];
         this.enableDebug = debug;
         const nodeKeys = Object
@@ -63,7 +86,7 @@ export class Parser<ITokenElements extends IAbstractTokenizer,
         (<[string,number][]>nodeKeys.map((key, index)=>[key, index]));
         const globalMock = nodeKeys
             .reduce(
-                (prev, current)=> {
+                (prev, current:string)=> {
                     prev[current] = this.nodeMap.get(current);
                     return prev;
                 }, {});
@@ -80,10 +103,10 @@ export class Parser<ITokenElements extends IAbstractTokenizer,
                 this.accept[this.nodeMap.get(key)] = [];
                 const thisEdge = this.startEdge[this.nodeMap.get(key)];
                 const elements = elementsBuilder[key](globalMock).map(element=>isArray(element) ? {
-                    rules: element[0],
-                    action: element[1],
-                } : element);
-                elements.forEach(rule=> {
+                        rules: element[0],
+                        action: element[1],
+                    } : element);
+                elements.forEach(rule => { //EACH RULE
                     let nowPoint = 0;
                     rule.rules.forEach((nowRule: number)=> {
                         const now = thisEdge[nowPoint];
@@ -112,36 +135,33 @@ export class Parser<ITokenElements extends IAbstractTokenizer,
                 }
             }
         });
-       // if (debug) {
-            this.tokenMapReverse = new Map<number,string>(<[number,string][]>
-                Array.from(this.tokenMap.keys()).map(key=>[this.tokenMap.get(key), key]));
-            this.nodeMapReverse = new Map<number,string>(<[number,string][]>
-                Array.from(this.nodeMap.keys()).map(key=>[this.nodeMap.get(key), key]));
-        //}
+        // provide the reversed mapping to provide debug information
+        this.tokenMapReverse = new Map<number,string>(<[number,string][]>
+            Array.from(this.tokenMap.keys()).map(key=>[this.tokenMap.get(key), key]));
+        this.nodeMapReverse = new Map<number,string>(<[number,string][]>
+            Array.from(this.nodeMap.keys()).map(key=>[this.nodeMap.get(key), key]));
+        console.log("construction ok");
     }
 
-    enableDebug: boolean;
-    tmpToken: string[];
-    tmpTokenType: number[];
-    parseNow: number;
-    tmpLRResult: any;
-    parseFailedFlag: Object;
-
-
-    __resharpLeftRecuresiveResult(originalResult: any) {
+    // according the feature of left recursive, we must convert it to
+    // right recursive, and to satisfy the order of left recursive
+    // we must reshape the result.
+    __reshapeLeftRecursiveResult(originalResult: any) {
         if (originalResult[originalResult.length - 2] != this.parseFailedFlag) {
             const nextArray = originalResult[originalResult.length - 2];
             const next = nextArray.slice(0, nextArray.length - 2);
             this.tmpLRResult = nextArray[nextArray.length - 1]([this.tmpLRResult].concat(next));
-            this.__resharpLeftRecuresiveResult(nextArray);
+            this.__reshapeLeftRecursiveResult(nextArray);
         }
     }
 
-    __parse_step(point: number, closure: ParserClosure) {
+    __parseStep(point: number, closure: ParserClosure) {
         const target = closure.target;
         const savedParseNow = this.parseNow;
         const edges = this.startEdge[target][point];
         if (this.accept[target][point]) {
+            // find a valid result, according to the greedy strategy
+            // we should store the result, and try to continue
             closure.finalParseResult = closure.tempParseResult;
             closure.finalParseResultPoint = point;
             closure.finalParseResultNow = this.parseNow;
@@ -155,7 +175,7 @@ export class Parser<ITokenElements extends IAbstractTokenizer,
                     if (this.enableDebug)console.log("success");
                     closure.tempParseResult.push(this.tmpToken[this.parseNow]);
                     this.parseNow++;
-                    this.__parse_step(edge.to, closure);
+                    this.__parseStep(edge.to, closure);
                 }
             }
             else {//non terminal
@@ -163,7 +183,7 @@ export class Parser<ITokenElements extends IAbstractTokenizer,
                 const tempResult = this.__parse(edge.rule);
                 if (tempResult != this.parseFailedFlag) {
                     closure.tempParseResult.push(tempResult);
-                    this.__parse_step(edge.to, closure);
+                    this.__parseStep(edge.to, closure);
                 }
             }
         }
@@ -176,7 +196,7 @@ export class Parser<ITokenElements extends IAbstractTokenizer,
                     throw parseResult;
                 }
                 this.tmpLRResult = parseResult;
-                this.__resharpLeftRecuresiveResult([parseResult, leftParseResult, this.parseFailedFlag]);
+                this.__reshapeLeftRecursiveResult([parseResult, leftParseResult, this.parseFailedFlag]);
                 throw this.tmpLRResult;
             }
             if (closure.parseLeftRecursive) {
@@ -192,7 +212,10 @@ export class Parser<ITokenElements extends IAbstractTokenizer,
 
     __parse(target: number, parseLeftRecursive: boolean = false) {
         this.parseStack.push([this.nodeMapReverse.get(target), this.parseNow]);
-        if (this.enableDebug)console.log(`parser ${this.nodeMapReverse.get(target)} @ ${this.tokenMapReverse.get(this.tmpTokenType[this.parseNow])} @ ${this.tmpToken[this.parseNow]} # ${parseLeftRecursive}`);
+        if (this.enableDebug)
+            console.log(`parser ${this.nodeMapReverse.get(target)} @ `
+                +`${this.tokenMapReverse.get(this.tmpTokenType[this.parseNow])}`
+                + `@ ${this.tmpToken[this.parseNow]} # ${parseLeftRecursive}`);
         let point = 0;
         if (parseLeftRecursive) {
             for (const edge of this.startEdge[target][point]) {
@@ -211,15 +234,16 @@ export class Parser<ITokenElements extends IAbstractTokenizer,
             finalParseResultPoint : 0
         };
         try{
-            this.__parse_step(point, closure);
+            this.__parseStep(point, closure);
         }catch(e){
+            if( e == this.errorFlag)throw e;
             return e;
         }
         this.parseStack.pop();
         return this.parseFailedFlag;
     }
-    savedParseStack: [string, number][];
-    parseStack: [string, number][];
+
+
     parse(token: string[], tokenType: number[], target: string) {
         this.tmpToken = token;
         this.tmpTokenType = tokenType;
@@ -233,18 +257,11 @@ export class Parser<ITokenElements extends IAbstractTokenizer,
                     const left = Math.max(0, item[1] - 2);
                     const right = Math.min(this.tmpToken.length - 1, item[1] + 2);
                     console.log(`   at parsing "${item[0]}":\n      ${
-                        this.tmpToken.map((_,index)=>index == item[1]?`[${_}]`:_).slice(left,right + 1)}`);
+                        this.tmpToken.map((x,index)=>index == item[1]?`[${x}]`:x).slice(left,right + 1)}`);
                 });
             return null;
         }
         return result;
 
     }
-
-}
-function mprint(obj){
-    if(isArray(obj))
-        return "[" + obj.map(x=>mprint(x)).join(",") + "]";
-    else
-        return obj;
 }

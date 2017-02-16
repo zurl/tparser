@@ -4,10 +4,10 @@
  *  Created at 10/30/2016
  */
 
-import {isArray, Tokenizer} from './tokenizer';
-import {Parser} from './parser';
-import {IMyTokenizer, IMyParser} from './json_eg_def';
-const tokenizer = new Tokenizer<IMyTokenizer>({
+import {isArray, Tokenizer} from '../lib/tokenizer';
+import {Parser} from '../lib/parser';
+import {IMyParserElements} from "./json_eg_def";
+export const tokenizer = new Tokenizer({
     split: /\s*(:|,|\{|}|\[|]|[0-9]+(\.[0-9]+)?|"[^"]*")\s*/y,
     number: /[0-9]+(\.[0-9]+)?/,
     string: /"[^"]*"/,
@@ -21,9 +21,9 @@ const tokenizer = new Tokenizer<IMyTokenizer>({
     $false: /false/,
     $null: /null/
 });
-const parser = new Parser<IMyTokenizer, IMyParser<IMyTokenizer>>({
-    token: tokenizer.token(),
-    tokenMap: tokenizer.tokenMap(),
+const parser = new Parser(tokenizer,{
+    //token: tokenizer.token(),
+    //tokenMap: tokenizer.tokenMap(),
     value: _=>[
         [[_.token.number], $=>$[0]],
         [[_.token.string], $=>$[0].substr(1,$[0].length-2)],
@@ -31,7 +31,7 @@ const parser = new Parser<IMyTokenizer, IMyParser<IMyTokenizer>>({
         [[_.token.$false], $=>false],
         [[_.token.$true], $=>true],
         [[_.array], $=>$[0]],
-        [[_.object], $=>$[0]]
+        [[_.object,_.token.fuck], $=>$[0]]
     ],
     item: _=>[
         [[_.token.string, _.token.$colon, _.value]
@@ -51,7 +51,7 @@ const parser = new Parser<IMyTokenizer, IMyParser<IMyTokenizer>>({
         [[_.object_meta, _.token.$comma, _.item], $=>Object.assign($[0], $[2])],
         [[_.item], $=>$[0]],
     ]
-}, false);
+});
 function mprint(obj) {
     if (isArray(obj))
         return "[" + obj.map(x=>mprint(x)).join(",") + "]";
