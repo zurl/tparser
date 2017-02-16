@@ -1,5 +1,5 @@
 {
-  "name": "tparse",
+  "name": "tparser",
   "version": "0.1.0",
   "description": "LL(1) Parser Generator with Strong Type in Typescript",
   "main": "index.js",
@@ -8,7 +8,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/zurl/tparse.git"
+    "url": "git+https://github.com/zurl/tparser.git"
   },
   "keywords": [
     "compiler",
@@ -17,7 +17,7 @@
   "author": "zhang chengyi",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/zurl/tparse/issues"
+    "url": "https://github.com/zurl/tparser/issues"
   },
-  "homepage": "https://github.com/zurl/tparse#readme"
+  "homepage": "https://github.com/zurl/tparser#readme"
 }

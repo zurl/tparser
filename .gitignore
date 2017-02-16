@@ -1,2 +1,4 @@
 .idea/
 dist/
+*.js
+*.js.map
