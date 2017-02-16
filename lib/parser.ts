@@ -32,7 +32,7 @@ class EdgeRule {
     }
 }
 export type ISymbol<IParserElements> = (_: IParserElements)=>(IParserElement|IParserElementTuple)[]
-export interface IAbstractParser<ITokenElements extends IAbstractTokenElements> {
+export interface IAbstractParserElements<ITokenElements extends IAbstractTokenElements> {
     token: ITokenElements;
     tokenMap: Map<string,number>;
 }
@@ -42,7 +42,7 @@ export interface IAbstractParser<ITokenElements extends IAbstractTokenElements> 
 // The generic constrain is virtual constrain that used to check the
 // validity of grammar rules.
 export class Parser<ITokenElements extends IAbstractTokenElements,
-    IParserElements extends IAbstractParser<ITokenElements>> {
+    IParserElements extends IAbstractParserElements<ITokenElements>> {
 
     startEdge: EdgeRule[][][]; // name, points, rules
     accept: (($: any[])=>any)[][];

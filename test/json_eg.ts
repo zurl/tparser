@@ -4,9 +4,10 @@
  *  Created at 10/30/2016
  */
 
-import {isArray, Tokenizer} from '../lib/tokenizer';
+import {Tokenizer} from '../lib/tokenizer';
 import {Parser} from '../lib/parser';
-import {IMyParserElements} from "./json_eg_def";
+import {IMyParserElements, IMyTokenElements} from "./json_eg_def";
+import {isArray} from "../lib/util";
 export const tokenizer = new Tokenizer({
     split: /\s*(:|,|\{|}|\[|]|[0-9]+(\.[0-9]+)?|"[^"]*")\s*/y,
     number: /[0-9]+(\.[0-9]+)?/,
@@ -21,9 +22,9 @@ export const tokenizer = new Tokenizer({
     $false: /false/,
     $null: /null/
 });
-const parser = new Parser(tokenizer,{
-    //token: tokenizer.token(),
-    //tokenMap: tokenizer.tokenMap(),
+const parser = new Parser<IMyTokenElements, IMyParserElements<IMyTokenElements>>({
+    token: tokenizer.token(),
+    tokenMap: tokenizer.tokenMap(),
     value: _=>[
         [[_.token.number], $=>$[0]],
         [[_.token.string], $=>$[0].substr(1,$[0].length-2)],
@@ -31,7 +32,7 @@ const parser = new Parser(tokenizer,{
         [[_.token.$false], $=>false],
         [[_.token.$true], $=>true],
         [[_.array], $=>$[0]],
-        [[_.object,_.token.fuck], $=>$[0]]
+        [[_.object], $=>$[0]]
     ],
     item: _=>[
         [[_.token.string, _.token.$colon, _.value]

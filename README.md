@@ -1,11 +1,11 @@
-tparse -- an LL(1) parser generator in TypeScript
+tparser -- an LL(1) parser generator in TypeScript
 ===================
 Author : Zhang Chengyi <zurl@live.com>
 
-tparse is an LL(1) parser generator in TypeScript,
+tparser is an LL(1) parser generator in TypeScript,
 which is used for making the parser quickly, easily and scaled.
 
-with tparse, you can
+with tparser, you can
 + Write Parser Without Compile it
 + Write Parser in Typed DSL
 + Check the syntax of Parser before test it
@@ -21,7 +21,7 @@ export interface IMyTokenizer extends IAbstractTokenizer {
     $plus: IToken;
     $minus: IToken;
     $div: IToken;
-    $multiply: IToken;
+    $multiply: [IToken, 2]; // you can provide the privilege level
     //...
 }
 ```
@@ -58,19 +58,17 @@ export interface IMyParser<T extends IAbstractTokenizer> extends IAbstactParser<
 const parser = new Parser<IMyTokenizer, IMyParser<IMyTokenizer>>({
     token: tokenizer.token(),
     tokenMap: tokenizer.tokenMap(),
-    number: _=>[
-        [[_.token.number],$=>parseInt($[0])] //first is the rules, the second is the action
+    number: _=>[ // the `_` stands for the self-bound elements
+                 // all of the number 
+        [[_.token.number],$=>parseInt($[0])] 
+        //first is the rules, the second is the action
     ],
     product: _=>[
-        { //this is just another syntax, which is equal to above one
-            rules: [_.number],
-            action: $=>$[0]
-        },
         [[_.product, _.token.$multiply, _.number],$=>$[0]*$[2]],
         [[_.product, _.token.$div, _.number],$=>$[0]/$[2]]
     ],
     sum: _=>[
-        [[_.product],$=>$[0]],
+        [[_.product],$=>$[0]], // the first is the rule, the second is the action
         [[_.sum, _.token.$plus, _.product],$=>$[0]+$[2]],
         [[_.sum, _.token.$minus, _.product],$=>$[0]-$[2]]
     ]
@@ -79,3 +77,9 @@ const [token, tokenType] = tokenizer.tokenize("5+4*3+6*2+1/4");
 const parseResult = parser.parse(token, tokenType, 'sum');
 console.log(parseResult);
 ```
+
+## appendix
+
+a experimental feature : the BNF-CONVERTER
+
+see on ./meta-compiler
