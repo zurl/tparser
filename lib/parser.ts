@@ -53,11 +53,14 @@ export class Parser<ITokenElements extends IAbstractTokenElements,
     nodeMapReverse: Map<number,string>;
     isLeftRecursive: boolean[];
 
+    tokenLine: number[];
+
     enableDebug: boolean;
     tmpToken: string[];
     tmpTokenType: number[];
     parseNow: number;
     tmpLRResult: any;
+    keepLine: boolean;
 
     // This two stack is just records of parsing procedure
     // which provide metadata to print debug information
@@ -70,8 +73,9 @@ export class Parser<ITokenElements extends IAbstractTokenElements,
     errorFlag : Object;
     parseFailedFlag: Object;
 
-    constructor(elementsBuilder: IParserElements, debug = false, errorFlag = {}) {
+    constructor(elementsBuilder: IParserElements, debug = false, keepLine = false, errorFlag = {}) {
         this.errorFlag = errorFlag;
+        this.keepLine = keepLine;
         this.tokenMap = elementsBuilder.tokenMap;
         this.__emptyParseFlag = false;
         this.parseFailedFlag = {};
@@ -176,7 +180,15 @@ export class Parser<ITokenElements extends IAbstractTokenElements,
                 if (this.tmpTokenType[this.parseNow] == edge.rule) {
                     this.savedParseStack = null;
                     if (this.enableDebug)console.log("success");
-                    closure.tempParseResult.push(this.tmpToken[this.parseNow]);
+                    if( this.keepLine){
+                        closure.tempParseResult.push([
+                            this.tmpToken[this.parseNow],
+                            this.tokenLine[this.parseNow]
+                        ]);
+                    }else{
+                        closure.tempParseResult.push(this.tmpToken[this.parseNow])
+                    }
+
                     this.parseNow++;
                     this.__parseStep(edge.to, closure);
                 }
@@ -266,9 +278,10 @@ export class Parser<ITokenElements extends IAbstractTokenElements,
     }
 
 
-    parse(token: string[], tokenType: number[], target: string) {
-        this.tmpToken = token;
-        this.tmpTokenType = tokenType;
+    parse(token: [string[], number[], number[]], target: string) {
+        this.tmpToken = token[0];
+        this.tmpTokenType = token[1];
+        this.tokenLine = token[2];
         this.parseNow = 0;
         const result =  this.__parse(this.nodeMap.get(target));
         this.__emptyParseFlag = false;

@@ -59,7 +59,12 @@ function mprint(obj) {
     else
         return obj;
 }
-const [token, tokenType] = tokenizer.tokenize(`
+function printLine(token){
+    for(let i = 0 ;i <= token[0].length; i++){
+        console.log(`${token[0][i]} (${token[2][i]}): ${parser.tokenMapReverse.get(token[1][i])}`)
+    }
+}
+const token = tokenizer.tokenize(`
 {
     "employees": [{"firstName": "Bill", "lastName": "Gates"},
         {"firstName": "George", "lastName": "Bush"}, {
@@ -68,5 +73,6 @@ const [token, tokenType] = tokenizer.tokenize(`
         }]
 }
 `);
-const parserResult = parser.parse(token, tokenType, 'object');
+const parserResult = parser.parse(token, 'object');
 console.log(parserResult);
+printLine(token);

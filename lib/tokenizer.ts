@@ -4,7 +4,7 @@
  *  Created at 11/1/2016
  */
 
-import {isArray} from "./util";
+import {isArray, countChr} from "./util";
 export interface IAbstractTokenElements {
     split: RegExp;
     [key: string]: IToken;
@@ -43,11 +43,15 @@ export class Tokenizer<ITokenElement extends IAbstractTokenElements> {
         return this.tokenElements;
     }
 
-    tokenize(str: string): [string[], number[]] {
+    tokenize(str: string): [string[], number[], number[]] {
+        let line = 1;
         const result = [];
+        const resultLine = [];
         let match;
         while (match = this.tokenElements.split.exec(str)) {
             result.push(match[1]);
+            resultLine.push(line);
+            line += countChr(match[0], '\n');
         }
         const type = result.map(token => {
             for (const regExpTuple of this.tokenRegExp) {
@@ -55,8 +59,8 @@ export class Tokenizer<ITokenElement extends IAbstractTokenElements> {
                     return regExpTuple[1];
                 }
             }
-            throw "illegal token";
+            throw `illegal token at ${token}`;
         });
-        return [result, type];
+        return [result, type, resultLine];
     }
 }

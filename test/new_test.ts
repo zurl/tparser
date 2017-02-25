@@ -43,15 +43,15 @@ const parser = new Parser<IMyTokenElements, IMyParserElements2<IMyTokenElements>
     fuck: _=>[
         [[_.decs, _.token.$comma], $=>$],
     ],
-},true);
+},true,true);
 function mprint(obj) {
     if (isArray(obj))
         return "[" + obj.map(x=>mprint(x)).join(",") + "]";
     else
         return obj;
 }
-const [token, tokenType] = tokenizer.tokenize(`
-,
+const token = tokenizer.tokenize(`
+: : :,
 `);
-const parserResult = parser.parse(token, tokenType, 'fuck');
+const parserResult = parser.parse(token, 'fuck');
 console.log(parserResult);
