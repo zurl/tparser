@@ -141,7 +141,7 @@ export class Parser<ITokenElements extends IAbstractTokenElements,
             Array.from(this.tokenMap.keys()).map(key=>[this.tokenMap.get(key), key]));
         this.nodeMapReverse = new Map<number,string>(<[number,string][]>
             Array.from(this.nodeMap.keys()).map(key=>[this.nodeMap.get(key), key]));
-        console.log("construction ok");
+        if(debug)console.log("construction ok");
     }
 
     // according the feature of left recursive, we must convert it to
@@ -186,7 +186,6 @@ export class Parser<ITokenElements extends IAbstractTokenElements,
                 const tempResult = this.__parse(edge.rule);
                 if(this.__emptyParseFlag){
                     closure.isEmptyFlag = true;
-                    console.log("fuc");
                 }
                 else closure.isEmptyFlag = false;
                 this.__emptyParseFlag = false;
@@ -224,7 +223,6 @@ export class Parser<ITokenElements extends IAbstractTokenElements,
             }
             if(closure.finalParseResultPoint == 0){
                 this.__emptyParseFlag = true;
-                console.log("fuck");
             }
             throw this.accept[target][closure.finalParseResultPoint](closure.finalParseResult);
         }
