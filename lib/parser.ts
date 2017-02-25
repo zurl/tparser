@@ -12,6 +12,7 @@ interface ParserClosure{
     finalParseResultNow: number;
     finalParseResultPoint: number;
     parseLeftRecursive: boolean;
+    isEmptyFlag: boolean;
 }
 interface IAbstractParserElement {
 
@@ -72,7 +73,7 @@ export class Parser<ITokenElements extends IAbstractTokenElements,
     constructor(elementsBuilder: IParserElements, debug = false, errorFlag = {}) {
         this.errorFlag = errorFlag;
         this.tokenMap = elementsBuilder.tokenMap;
-
+        this.__emptyParseFlag = false;
         this.parseFailedFlag = {};
         this.startEdge = [];
         this.accept = [];
@@ -144,7 +145,7 @@ export class Parser<ITokenElements extends IAbstractTokenElements,
     }
 
     // according the feature of left recursive, we must convert it to
-    // right recursive, and to satisfy the order of left recursive
+    // right recursive, and to satisfy the order of left recursive,
     // we must reshape the result.
     __reshapeLeftRecursiveResult(originalResult: any) {
         if (originalResult[originalResult.length - 2] != this.parseFailedFlag) {
@@ -154,6 +155,8 @@ export class Parser<ITokenElements extends IAbstractTokenElements,
             this.__reshapeLeftRecursiveResult(nextArray);
         }
     }
+
+    __emptyParseFlag: boolean;
 
     __parseStep(point: number, closure: ParserClosure) {
         const target = closure.target;
@@ -181,6 +184,12 @@ export class Parser<ITokenElements extends IAbstractTokenElements,
             else {//non terminal
                 if (this.enableDebug)console.log(`try ${this.nodeMapReverse.get(edge.rule)}`);
                 const tempResult = this.__parse(edge.rule);
+                if(this.__emptyParseFlag){
+                    closure.isEmptyFlag = true;
+                    console.log("fuc");
+                }
+                else closure.isEmptyFlag = false;
+                this.__emptyParseFlag = false;
                 if (tempResult != this.parseFailedFlag) {
                     closure.tempParseResult.push(tempResult);
                     this.__parseStep(edge.to, closure);
@@ -189,19 +198,33 @@ export class Parser<ITokenElements extends IAbstractTokenElements,
         }
         if (closure.finalParseResult) {
             this.parseNow = closure.finalParseResultNow;
+            // specify the left recursive condition, use the special strategy
+            // to parse lr item.
             if (this.isLeftRecursive[target] && !closure.parseLeftRecursive) {
                 const leftParseResult = this.__parse(target, true);
+                this.__emptyParseFlag = false;
                 const parseResult = this.accept[target][closure.finalParseResultPoint](closure.finalParseResult);
-                if (leftParseResult == this.parseFailedFlag) { //single node
+                if (leftParseResult == this.parseFailedFlag ) { //single node
                     throw parseResult;
                 }
                 this.tmpLRResult = parseResult;
                 this.__reshapeLeftRecursiveResult([parseResult, leftParseResult, this.parseFailedFlag]);
                 throw this.tmpLRResult;
             }
+            // As it to parse continually
             if (closure.parseLeftRecursive) {
-                closure.finalParseResult.push(this.__parse(target, true));
+                // append the result reversely
+                if(!closure.isEmptyFlag) {  // see on ` items ::= items item | item, item ::= sth | eps`
+                    closure.finalParseResult.push(this.__parse(target, true));
+                }
+                else{
+                    throw this.parseFailedFlag;
+                }
                 throw closure.finalParseResult.concat([this.accept[target][closure.finalParseResultPoint]]);
+            }
+            if(closure.finalParseResultPoint == 0){
+                this.__emptyParseFlag = true;
+                console.log("fuck");
             }
             throw this.accept[target][closure.finalParseResultPoint](closure.finalParseResult);
         }
@@ -231,7 +254,8 @@ export class Parser<ITokenElements extends IAbstractTokenElements,
             tempParseResult: [],
             finalParseResult: null,
             finalParseResultNow: this.parseNow,
-            finalParseResultPoint : 0
+            finalParseResultPoint : 0,
+            isEmptyFlag : false
         };
         try{
             this.__parseStep(point, closure);
@@ -249,6 +273,7 @@ export class Parser<ITokenElements extends IAbstractTokenElements,
         this.tmpTokenType = tokenType;
         this.parseNow = 0;
         const result =  this.__parse(this.nodeMap.get(target));
+        this.__emptyParseFlag = false;
         if(result == this.parseFailedFlag){
             console.log("Parsing Failed:");
             this.savedParseStack
